@@ -1,0 +1,6 @@
+name = "warden-worker"
+main = "build/index.js"
+compatibility_date = "2025-09-19"
+
+[build]
+command = "cargo install -q worker-build && worker-build --release"
