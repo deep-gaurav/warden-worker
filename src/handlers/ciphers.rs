@@ -2,40 +2,79 @@ use axum::{extract::State, Json};
 use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
-use worker::Env;
+use worker::{query, Env};
 
-use crate::{auth::Claims, db, error::AppError, models::cipher::Cipher};
+use crate::auth::Claims;
+use crate::db;
+use crate::error::AppError;
+use crate::models::cipher::{Cipher, CipherData, CreateCipherRequest};
 
 #[worker::send]
 pub async fn create_cipher(
     claims: Claims,
     State(env): State<Arc<Env>>,
-    Json(mut payload): Json<Cipher>,
+    Json(payload): Json<CreateCipherRequest>,
 ) -> Result<Json<Cipher>, AppError> {
     let db = db::get_db(&env)?;
-    let now = Utc::now().to_rfc3339();
+    let now = Utc::now();
+    let now = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+    let cipher_data_req = payload.cipher;
 
-    payload.id = Uuid::new_v4().to_string();
-    payload.user_id = Some(claims.sub);
-    payload.created_at = now.clone();
-    payload.updated_at = now;
+    let cipher_data = CipherData {
+        name: cipher_data_req.name,
+        notes: cipher_data_req.notes,
+        login: cipher_data_req.login,
+        card: cipher_data_req.card,
+        identity: cipher_data_req.identity,
+        secure_note: cipher_data_req.secure_note,
+        fields: cipher_data_req.fields,
+        password_history: cipher_data_req.password_history,
+        reprompt: cipher_data_req.reprompt,
+    };
 
-    db.prepare(
-        "INSERT INTO ciphers (id, user_id, type, data, favorite, folder_id, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-    )
-    .bind(&[
-        payload.id.clone().into(),
-        payload.user_id.clone().into(),
-        payload.r#type.into(),
-        serde_json::to_string(&payload.data).unwrap().into(),
-        payload.favorite.into(),
-        payload.folder_id.clone().into(),
-        payload.created_at.clone().into(),
-        payload.updated_at.clone().into(),
-    ])?
+    let data_value = serde_json::to_value(&cipher_data).map_err(|_| AppError::Internal)?;
+
+    let cipher = Cipher {
+        id: Uuid::new_v4().to_string(),
+        user_id: Some(claims.sub.clone()),
+        organization_id: cipher_data_req.organization_id.clone(),
+        r#type: cipher_data_req.r#type,
+        data: data_value,
+        favorite: cipher_data_req.favorite,
+        folder_id: cipher_data_req.folder_id.clone(),
+        deleted_at: None,
+        created_at: now.clone(),
+        updated_at: now.clone(),
+        object: "cipher".to_string(),
+        organization_use_totp: false,
+        edit: true,
+        view_password: true,
+        collection_ids: if payload.collection_ids.is_empty() {
+            None
+        } else {
+            Some(payload.collection_ids)
+        },
+    };
+
+    let data = serde_json::to_string(&cipher.data).map_err(|_| AppError::Internal)?;
+
+    query!(
+        &db,
+        "INSERT INTO ciphers (id, user_id, organization_id, type, data, favorite, folder_id, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+         cipher.id,
+         cipher.user_id,
+         cipher.organization_id,
+         cipher.r#type,
+         data,
+         cipher.favorite,
+
+         cipher.folder_id,
+         cipher.created_at,
+         cipher.updated_at,
+    ).map_err(|_|AppError::Database)?
     .run()
     .await?;
 
-    Ok(Json(payload))
+    Ok(Json(cipher))
 }

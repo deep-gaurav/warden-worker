@@ -37,7 +37,7 @@ pub struct SyncResponse {
     pub profile: Profile,
     #[serde(rename = "Folders")]
     pub folders: Vec<Folder>,
-    #[serde(rename = "Ciphers")]
+    #[serde(rename = "ciphers")]
     pub ciphers: Vec<Cipher>,
     #[serde(rename = "Domains")]
     pub domains: Value,

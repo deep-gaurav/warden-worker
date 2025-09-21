@@ -13,8 +13,15 @@ pub fn api_router(env: Env) -> Router {
     Router::new()
         // Identity/Auth routes
         .route("/identity/accounts/prelogin", post(accounts::prelogin))
-        .route("/identity/accounts/register", post(accounts::register))
+        .route(
+            "/identity/accounts/register/finish",
+            post(accounts::register),
+        )
         .route("/identity/connect/token", post(identity::token))
+        .route(
+            "/identity/accounts/register/send-verification-email",
+            post(accounts::send_verification_email),
+        )
         // Main data sync route
         .route("/api/sync", get(sync::get_sync_data))
         // Ciphers CRUD

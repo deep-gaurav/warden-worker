@@ -1,5 +1,6 @@
 use axum::{extract::State, Json};
 use chrono::Utc;
+use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid::Uuid;
 use worker::{query, D1Database, Env};
@@ -39,7 +40,7 @@ pub async fn prelogin(
 pub async fn register(
     State(env): State<Arc<Env>>,
     Json(payload): Json<RegisterRequest>,
-) -> Result<Json<()>, AppError> {
+) -> Result<Json<Value>, AppError> {
     log::info!("Get db");
     let db = db::get_db(&env)?;
     log::info!("db got");
@@ -88,5 +89,10 @@ pub async fn register(
         AppError::Database
     })?;
 
-    Ok(Json(()))
+    Ok(Json(json!({})))
+}
+
+#[worker::send]
+pub async fn send_verification_email() -> String {
+    "fixed-token-to-mock".to_string()
 }
