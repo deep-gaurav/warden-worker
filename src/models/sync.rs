@@ -1,4 +1,4 @@
-use super::{cipher::Cipher, folder::Folder};
+use super::{cipher::Cipher, folder::FolderResponse};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -33,10 +33,10 @@ pub struct Profile {
 
 #[derive(Debug, Serialize)]
 pub struct SyncResponse {
-    #[serde(rename = "Profile")]
+    #[serde(rename = "profile")]
     pub profile: Profile,
-    #[serde(rename = "Folders")]
-    pub folders: Vec<Folder>,
+    #[serde(rename = "folders")]
+    pub folders: Vec<FolderResponse>,
     #[serde(rename = "ciphers")]
     pub ciphers: Vec<Cipher>,
     #[serde(rename = "Domains")]

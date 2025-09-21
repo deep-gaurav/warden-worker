@@ -3,3 +3,4 @@ pub mod ciphers;
 pub mod config;
 pub mod identity;
 pub mod sync;
+pub mod folders;

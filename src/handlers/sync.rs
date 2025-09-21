@@ -9,7 +9,7 @@ use crate::{
     error::AppError,
     models::{
         cipher::{Cipher, CipherDBModel},
-        folder::Folder,
+        folder::{Folder, FolderResponse},
         sync::{Profile, SyncResponse},
         user::User,
     },
@@ -32,12 +32,14 @@ pub async fn get_sync_data(
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     // Fetch folders
-    let folders: Vec<Folder> = db
+    let folders_db: Vec<Folder> = db
         .prepare("SELECT * FROM folders WHERE user_id = ?1")
         .bind(&[user_id.clone().into()])?
         .all()
         .await?
         .results()?;
+
+    let folders: Vec<FolderResponse> = folders_db.into_iter().map(|f| f.into()).collect();
 
     // Fetch ciphers
     let ciphers: Vec<Value> = db

@@ -147,6 +147,8 @@ pub async fn update_cipher(
         cipher.favorite,
         cipher.folder_id,
         cipher.updated_at,
+        id,
+        claims.sub,
     ).map_err(|_|AppError::Database)?
     .run()
     .await?;

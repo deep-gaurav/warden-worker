@@ -1,11 +1,11 @@
 use axum::{
-    routing::{get, post, put},
+    routing::{get, post, put, delete},
     Router,
 };
 use std::sync::Arc;
 use worker::Env;
 
-use crate::handlers::{accounts, ciphers, config, identity, sync};
+use crate::handlers::{accounts, ciphers, config, identity, sync, folders};
 
 pub fn api_router(env: Env) -> Router {
     let app_state = Arc::new(env);
@@ -28,6 +28,10 @@ pub fn api_router(env: Env) -> Router {
         .route("/api/ciphers/create", post(ciphers::create_cipher))
         .route("/api/ciphers/{id}", put(ciphers::update_cipher))
         .route("/api/ciphers/{id}/delete", put(ciphers::delete_cipher))
+        // Folders CRUD
+        .route("/api/folders", post(folders::create_folder))
+        .route("/api/folders/{id}", put(folders::update_folder))
+        .route("/api/folders/{id}", delete(folders::delete_folder))
         .route("/api/config", get(config::config))
         .with_state(app_state)
 }
