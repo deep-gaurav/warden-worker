@@ -23,7 +23,6 @@ pub async fn get_sync_data(
     let user_id = claims.sub;
     let db = db::get_db(&env)?;
 
-    log::info!("Fetch user");
     // Fetch profile
     let user: User = db
         .prepare("SELECT * FROM users WHERE id = ?1")
@@ -32,7 +31,6 @@ pub async fn get_sync_data(
         .await?
         .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
-    log::info!("Fetch folders");
     // Fetch folders
     let folders: Vec<Folder> = db
         .prepare("SELECT * FROM folders WHERE user_id = ?1")
@@ -41,7 +39,6 @@ pub async fn get_sync_data(
         .await?
         .results()?;
 
-    log::info!("Fetch ciphers");
     // Fetch ciphers
     let ciphers: Vec<Value> = db
         .prepare("SELECT * FROM ciphers WHERE user_id = ?1")
@@ -64,7 +61,6 @@ pub async fn get_sync_data(
         .map(|cipher| cipher.into())
         .collect::<Vec<Cipher>>();
 
-    log::info!("Fetch time");
     let time = chrono::DateTime::parse_from_rfc3339(&user.created_at)
         .map_err(|_| AppError::Internal)?
         .to_rfc3339_opts(chrono::SecondsFormat::Micros, true);

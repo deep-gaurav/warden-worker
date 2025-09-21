@@ -170,7 +170,6 @@ impl Serialize for Cipher {
         response_map.insert("creationDate".to_string(), json!(self.created_at));
         response_map.insert("deletedDate".to_string(), json!(self.deleted_at));
 
-        log::debug!("Response data is {:?}", self.data);
         if let Some(data_obj) = self.data.as_object() {
             let data_clone = data_obj.clone();
 

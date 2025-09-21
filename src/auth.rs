@@ -1,6 +1,6 @@
 use axum::{
-    extract::{FromRequestParts, State},
-    http::{header, request::Parts, StatusCode},
+    extract::FromRequestParts,
+    http::{header, request::Parts},
 };
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
@@ -8,10 +8,6 @@ use std::sync::Arc;
 use worker::Env;
 
 use crate::error::AppError;
-
-// Secret key for signing JWTs. In a real application, this should be a strong,
-// securely stored secret from the Worker's environment variables.
-const JWT_SECRET: &str = "a-very-secure-secret-key-that-should-be-in-env";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
@@ -26,13 +22,11 @@ pub struct Claims {
     pub amr: Vec<String>,
 }
 
-impl<S> FromRequestParts<S> for Claims
-where
-    S: Send + Sync,
+impl FromRequestParts<Arc<Env>> for Claims
 {
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &Arc<Env>) -> Result<Self, Self::Rejection> {
         // Extract the token from the authorization header
         let token = parts
             .headers
@@ -47,8 +41,10 @@ where
             })
             .ok_or_else(|| AppError::Unauthorized("Missing or invalid token".to_string()))?;
 
+        let secret = state.secret("JWT_SECRET")?;
+
         // Decode and validate the token
-        let decoding_key = DecodingKey::from_secret(JWT_SECRET.as_ref());
+        let decoding_key = DecodingKey::from_secret(secret.to_string().as_ref());
         let token_data = decode::<Claims>(&token, &decoding_key, &Validation::default())
             .map_err(|_| AppError::Unauthorized("Invalid token".to_string()))?;
 

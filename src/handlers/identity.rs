@@ -54,7 +54,6 @@ pub async fn token(
     State(env): State<Arc<Env>>,
     Form(payload): Form<TokenRequest>,
 ) -> Result<Json<TokenResponse>, AppError> {
-    log::info!("Token payload {payload:?}");
     if payload.grant_type != "password" {
         return Err(AppError::BadRequest("Unsupported grant_type".to_string()));
     }
@@ -64,7 +63,6 @@ pub async fn token(
 
     let db = db::get_db(&env)?;
 
-    log::info!("Lookup user");
     let user: Value = db
         .prepare("SELECT * FROM users WHERE email = ?1")
         .bind(&[payload.username.to_lowercase().into()])?
@@ -72,17 +70,14 @@ pub async fn token(
         .await
         .map_err(|_| AppError::Unauthorized("Invalid credentials".to_string()))?
         .ok_or_else(|| AppError::Unauthorized("Invalid credentials".to_string()))?;
-    log::info!("User is {user:?}");
     let user: User = serde_json::from_value(user).map_err(|_| AppError::Internal)?;
     // Securely compare the provided hash with the stored hash
     if !constant_time_eq(
         user.master_password_hash.as_bytes(),
         password_hash.as_bytes(),
     ) {
-        log::info!("Password is incorrect");
         return Err(AppError::Unauthorized("Invalid credentials".to_string()));
     }
-    log::info!("Password matched");
 
     // Create JWT claims
     let now = Utc::now();

@@ -21,7 +21,6 @@ pub async fn prelogin(
         .ok_or_else(|| AppError::BadRequest("Missing email".to_string()))?;
     let db = db::get_db(&env)?;
 
-    log::info!("Getting kdf for user {email:?}");
     let stmt = db.prepare("SELECT kdf_iterations FROM users WHERE email = ?1");
     let query = stmt.bind(&[email.into()])?;
     let kdf_iterations: Option<i32> = query
@@ -29,7 +28,6 @@ pub async fn prelogin(
         .await
         .map_err(|_| AppError::Database)?;
 
-    log::info!("Returning {kdf_iterations:?}");
     Ok(Json(PreloginResponse {
         kdf: 0, // PBKDF2
         kdf_iterations: kdf_iterations.unwrap_or(600_000),
@@ -41,9 +39,20 @@ pub async fn register(
     State(env): State<Arc<Env>>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<Json<Value>, AppError> {
-    log::info!("Get db");
+    let allowed_emails = env
+        .secret("ALLOWED_EMAILS")
+        .map_err(|_| AppError::Internal)?;
+    let allowed_emails = allowed_emails
+        .as_ref()
+        .as_string()
+        .ok_or_else(|| AppError::Internal)?;
+    if allowed_emails
+        .split(",")
+        .all(|email| email.trim() != payload.email)
+    {
+        return Err(AppError::Unauthorized("Not allowed to signup".to_string()));
+    }
     let db = db::get_db(&env)?;
-    log::info!("db got");
     let now = Utc::now().to_rfc3339();
     let user = User {
         id: Uuid::new_v4().to_string(),
@@ -62,7 +71,6 @@ pub async fn register(
         updated_at: now,
     };
 
-    log::info!("User {user:?}");
     let query = query!(
         &db,
         "INSERT INTO users (id, name, email, master_password_hash, key, private_key, public_key, kdf_iterations, security_stamp, created_at, updated_at)
@@ -79,13 +87,11 @@ pub async fn register(
          user.created_at,
          user.updated_at
     ).map_err(|error|{
-        log::error!("failed {error:?}");
         AppError::Database
     })?
     .run()
     .await
     .map_err(|error|{
-        log::error!("failed {error:?}");
         AppError::Database
     })?;
 
