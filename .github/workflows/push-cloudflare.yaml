@@ -46,4 +46,3 @@ jobs:
               with:
                   apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
                   accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-                  command: deploy --branch=${{ github.ref_name }} --commit-hash=${{ github.event.pull_request.head.sha || github.sha }}
