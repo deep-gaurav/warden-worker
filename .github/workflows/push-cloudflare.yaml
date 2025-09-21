@@ -1,0 +1,49 @@
+name: Build
+
+on:
+    push:
+        branches: [main, uat, release*]
+    pull_request_target:
+        branches: [main, uat, release*]
+    workflow_dispatch:
+
+jobs:
+    build:
+        name: Run production build
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            # selecting a toolchain either by action or manual `rustup` calls should happen
+            # before the plugin, as the cache uses the current rustc version as its cache key
+            - run: rustup toolchain install stable --profile minimal
+            - name: Cache Cargo registry and build artifacts
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      target
+                      ~/.cargo/bin
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                  key: cargo-build-cache-${{ github.run_id }}
+                  restore-keys: |
+                      cargo-build-cache-
+            - run: rustup target add wasm32-unknown-unknown
+            - name: Install lld
+              run: sudo apt install -y lld clang gcc llvm
+
+            - name: Install worker-build
+              run: |
+                  if ! command -v worker-build &> /dev/null; then
+                    cargo install worker-build
+                  fi
+
+            - uses: cloudflare/wrangler-action@v3
+              id: cf
+              env:
+                  D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+              with:
+                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  command: deploy --branch=${{ github.ref_name }} --commit-hash=${{ github.event.pull_request.head.sha || github.sha }}
