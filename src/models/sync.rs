@@ -1,4 +1,4 @@
-use super::{cipher::Cipher, folder::Folder, user::User};
+use super::{cipher::Cipher, folder::Folder};
 use serde::Serialize;
 use serde_json::Value;
 

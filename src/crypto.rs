@@ -49,7 +49,7 @@ pub async fn pbkdf2_sha256(
 
     let salt_array = Uint8Array::new_from_slice(salt);
     // Define PBKDF2 parameters
-    let mut params = web_sys::Pbkdf2Params::new(
+    let params = web_sys::Pbkdf2Params::new(
         "PBKDF2",
         JsValue::from_str("SHA-256").as_ref(),
         iterations,

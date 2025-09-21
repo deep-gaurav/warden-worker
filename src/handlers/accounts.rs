@@ -3,7 +3,7 @@ use chrono::Utc;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use uuid::Uuid;
-use worker::{query, D1Database, Env};
+use worker::{query, Env};
 
 use crate::{
     db,

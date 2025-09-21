@@ -5,7 +5,7 @@ use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
-use worker::{D1Database, Env};
+use worker::Env;
 
 use crate::{auth::Claims, db, error::AppError, models::user::User};
 
