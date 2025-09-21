@@ -1,7 +1,7 @@
 use axum::{extract::State, Form, Json};
 use chrono::{Duration, Utc};
 use constant_time_eq::constant_time_eq;
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
@@ -12,9 +12,9 @@ use crate::{auth::Claims, db, error::AppError, models::user::User};
 #[derive(Debug, Deserialize)]
 pub struct TokenRequest {
     grant_type: String,
-    username: String,
+    username: Option<String>,
     password: Option<String>, // This is the masterPasswordHash
-                              // Other fields like scope, client_id, device info are ignored for this basic implementation
+    refresh_token: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -49,63 +49,53 @@ pub struct UserDecryptionOptions {
     pub object: String,
 }
 
-#[worker::send]
-pub async fn token(
-    State(env): State<Arc<Env>>,
-    Form(payload): Form<TokenRequest>,
+fn generate_tokens_and_response(
+    user: User,
+    env: &Arc<Env>,
 ) -> Result<Json<TokenResponse>, AppError> {
-    if payload.grant_type != "password" {
-        return Err(AppError::BadRequest("Unsupported grant_type".to_string()));
-    }
-    let password_hash = payload
-        .password
-        .ok_or_else(|| AppError::BadRequest("Missing password".to_string()))?;
-
-    let db = db::get_db(&env)?;
-
-    let user: Value = db
-        .prepare("SELECT * FROM users WHERE email = ?1")
-        .bind(&[payload.username.to_lowercase().into()])?
-        .first(None)
-        .await
-        .map_err(|_| AppError::Unauthorized("Invalid credentials".to_string()))?
-        .ok_or_else(|| AppError::Unauthorized("Invalid credentials".to_string()))?;
-    let user: User = serde_json::from_value(user).map_err(|_| AppError::Internal)?;
-    // Securely compare the provided hash with the stored hash
-    if !constant_time_eq(
-        user.master_password_hash.as_bytes(),
-        password_hash.as_bytes(),
-    ) {
-        return Err(AppError::Unauthorized("Invalid credentials".to_string()));
-    }
-
-    // Create JWT claims
     let now = Utc::now();
     let expires_in = Duration::hours(1);
     let exp = (now + expires_in).timestamp() as usize;
 
-    let claims = Claims {
+    let access_claims = Claims {
         sub: user.id.clone(),
         exp,
         nbf: now.timestamp() as usize,
         premium: true,
-        name: user.name.unwrap_or("User".to_string()),
-        email: user.email,
+        name: user.name.clone().unwrap_or_else(|| "User".to_string()),
+        email: user.email.clone(),
         email_verified: true,
         amr: vec!["Application".into()],
     };
 
-    let token = encode(
+    let jwt_secret = env.secret("JWT_SECRET")?.to_string();
+    let access_token = encode(
         &Header::default(),
-        &claims,
-        &EncodingKey::from_secret("a-very-secure-secret-key-that-should-be-in-env".as_ref()),
+        &access_claims,
+        &EncodingKey::from_secret(jwt_secret.as_ref()),
     )?;
 
-    // In a real implementation, the refresh token would be securely generated and stored
-    let refresh_token = "static-refresh-token-for-this-example".to_string();
+    let refresh_expires_in = Duration::days(30);
+    let refresh_exp = (now + refresh_expires_in).timestamp() as usize;
+    let refresh_claims = Claims {
+        sub: user.id.clone(),
+        exp: refresh_exp,
+        nbf: now.timestamp() as usize,
+        premium: true,
+        name: user.name.unwrap_or_else(|| "User".to_string()),
+        email: user.email.clone(),
+        email_verified: true,
+        amr: vec!["Application".into()],
+    };
+    let jwt_refresh_secret = env.secret("JWT_REFRESH_SECRET")?.to_string();
+    let refresh_token = encode(
+        &Header::default(),
+        &refresh_claims,
+        &EncodingKey::from_secret(jwt_refresh_secret.as_ref()),
+    )?;
 
     Ok(Json(TokenResponse {
-        access_token: token,
+        access_token,
         expires_in: expires_in.num_seconds(),
         token_type: "Bearer".to_string(),
         refresh_token,
@@ -119,4 +109,66 @@ pub async fn token(
             object: "userDecryptionOptions".to_string(),
         },
     }))
+}
+
+#[worker::send]
+pub async fn token(
+    State(env): State<Arc<Env>>,
+    Form(payload): Form<TokenRequest>,
+) -> Result<Json<TokenResponse>, AppError> {
+    let db = db::get_db(&env)?;
+    match payload.grant_type.as_str() {
+        "password" => {
+            let username = payload
+                .username
+                .ok_or_else(|| AppError::BadRequest("Missing username".to_string()))?;
+            let password_hash = payload
+                .password
+                .ok_or_else(|| AppError::BadRequest("Missing password".to_string()))?;
+
+            let user: Value = db
+                .prepare("SELECT * FROM users WHERE email = ?1")
+                .bind(&[username.to_lowercase().into()])?
+                .first(None)
+                .await
+                .map_err(|_| AppError::Unauthorized("Invalid credentials".to_string()))?
+                .ok_or_else(|| AppError::Unauthorized("Invalid credentials".to_string()))?;
+            let user: User = serde_json::from_value(user).map_err(|_| AppError::Internal)?;
+            // Securely compare the provided hash with the stored hash
+            if !constant_time_eq(
+                user.master_password_hash.as_bytes(),
+                password_hash.as_bytes(),
+            ) {
+                return Err(AppError::Unauthorized("Invalid credentials".to_string()));
+            }
+
+            generate_tokens_and_response(user, &env)
+        }
+        "refresh_token" => {
+            let refresh_token = payload
+                .refresh_token
+                .ok_or_else(|| AppError::BadRequest("Missing refresh_token".to_string()))?;
+
+            let jwt_refresh_secret = env.secret("JWT_REFRESH_SECRET")?.to_string();
+            let token_data = decode::<Claims>(
+                &refresh_token,
+                &DecodingKey::from_secret(jwt_refresh_secret.as_ref()),
+                &Validation::default(),
+            )
+            .map_err(|_| AppError::Unauthorized("Invalid refresh token".to_string()))?;
+
+            let user_id = token_data.claims.sub;
+            let user: Value = db
+                .prepare("SELECT * FROM users WHERE id = ?1")
+                .bind(&[user_id.into()])?
+                .first(None)
+                .await
+                .map_err(|_| AppError::Unauthorized("Invalid user".to_string()))?
+                .ok_or_else(|| AppError::Unauthorized("Invalid user".to_string()))?;
+            let user: User = serde_json::from_value(user).map_err(|_| AppError::Internal)?;
+
+            generate_tokens_and_response(user, &env)
+        }
+        _ => Err(AppError::BadRequest("Unsupported grant_type".to_string())),
+    }
 }
