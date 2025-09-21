@@ -1,5 +1,5 @@
 use axum::{
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 use std::sync::Arc;
@@ -26,6 +26,8 @@ pub fn api_router(env: Env) -> Router {
         .route("/api/sync", get(sync::get_sync_data))
         // Ciphers CRUD
         .route("/api/ciphers/create", post(ciphers::create_cipher))
+        .route("/api/ciphers/{id}", put(ciphers::update_cipher))
+        .route("/api/ciphers/{id}/delete", put(ciphers::delete_cipher))
         .route("/api/config", get(config::config))
         .with_state(app_state)
 }
