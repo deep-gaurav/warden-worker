@@ -10,6 +10,10 @@ release = false
 [lib]
 crate-type = ["cdylib"]
 
+[profile.release]
+lto = true
+codegen-units = 1
+
 [dependencies]
 # Worker & Web APIs
 worker = { version = "0.6", features = ["axum", "http", "d1"] }
