@@ -4,3 +4,8 @@ compatibility_date = "2025-09-19"
 
 [build]
 command = "cargo install -q worker-build && worker-build --release"
+
+[[d1_databases]]
+binding = "vault1"
+database_name = "vault1"
+database_id = "${D1_DATABASE_ID}"

@@ -1,21 +1,33 @@
-use axum::{routing::get, Router};
+use axum::Router;
+use tower_http::cors::{Any, CorsLayer};
 use tower_service::Service;
 use worker::*;
 
-fn router() -> Router {
-    Router::new().route("/", get(root))
-}
+mod auth;
+mod crypto;
+mod db;
+mod error;
+mod handlers;
+mod models;
+mod router;
 
 #[event(fetch)]
-async fn fetch(
+pub async fn main(
     req: HttpRequest,
-    _env: Env,
+    env: Env,
     _ctx: Context,
 ) -> Result<axum::http::Response<axum::body::Body>> {
+    // Set up logging
     console_error_panic_hook::set_once();
-    Ok(router().call(req).await?)
-}
+    console_log::init_with_level(log::Level::Debug);
 
-pub async fn root() -> &'static str {
-    "Hello Axum!"
+    // Allow all origins for CORS, which is typical for a public API like Bitwarden's.
+    let cors = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .allow_origin(Any);
+
+    let mut app = router::api_router(env).layer(cors);
+
+    Ok(app.call(req).await?)
 }
