@@ -4,3 +4,4 @@ pub mod config;
 pub mod identity;
 pub mod sync;
 pub mod folders;
+pub mod import;
