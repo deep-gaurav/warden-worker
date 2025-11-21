@@ -1,51 +1,65 @@
 name: Build
 
 on:
-    push:
-        branches: [main, uat, release*]
-    pull_request_target:
-        branches: [main, uat, release*]
-    workflow_dispatch:
+  push:
+    branches: [main, uat, release*]
+  pull_request_target:
+    branches: [main, uat, release*]
+  workflow_dispatch:
 
 jobs:
-    build:
-        name: Run production build
-        runs-on: ubuntu-latest
+  build:
+    name: Run production build
+    runs-on: ubuntu-latest
 
-        steps:
-            - uses: actions/checkout@v4
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-            # selecting a toolchain either by action or manual `rustup` calls should happen
-            # before the plugin, as the cache uses the current rustc version as its cache key
-            - run: rustup toolchain install stable --profile minimal
-            - name: Cache Cargo registry and build artifacts
-              uses: actions/cache@v3
-              with:
-                  path: |
-                      target
-                      ~/.cargo/bin
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                  key: cargo-build-cache-${{ github.run_id }}
-                  restore-keys: |
-                      cargo-build-cache-
-            - run: rustup target add wasm32-unknown-unknown
-            - name: Install lld
-              run: sudo apt install -y lld clang gcc llvm
+      # 固定 Rust 版本，而不是默认 stable 滚动升级
+      - name: Install Rust toolchain
+        run: |
+          rustup toolchain install 1.75.0 --profile minimal
+          rustup default 1.75.0
 
-            - name: Install worker-build
-              run: |
-                  if ! command -v worker-build &> /dev/null; then
-                    cargo install worker-build
-                  fi
+      # 固定 cache action 版本
+      - name: Cache Cargo registry and build artifacts
+        uses: actions/cache@v3
+        with:
+          path: |
+            target
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-build-cache-${{ github.run_id }}
+          restore-keys: |
+            cargo-build-cache-
 
-            - name: Replace D1_DATABASE_ID in wrangler.toml
-              run: sed -i "s/\${D1_DATABASE_ID}/${{ secrets.D1_DATABASE_ID }}/g" wrangler.toml
+      # 固定 wasm target
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
 
-            - uses: cloudflare/wrangler-action@v3
-              id: cf
-              env:
-                  D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-              with:
-                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # 固定编译工具链版本
+      - name: Install lld
+        run: sudo apt-get update && sudo apt-get install -y lld=1:14.0-55~ubuntu1 clang gcc llvm
+
+      # 固定 worker-build 版本，不使用最新
+      - name: Install worker-build
+        run: |
+          if ! command -v worker-build &> /dev/null; then
+            cargo install worker-build --version 0.3.0
+          fi
+
+      # 替换配置
+      - name: Replace D1_DATABASE_ID in wrangler.toml
+        run: sed -i "s/\${D1_DATABASE_ID}/${{ secrets.D1_DATABASE_ID }}/g" wrangler.toml
+
+      # 固定 wrangler-action 到确定版本
+      - name: Publish to Cloudflare
+        uses: cloudflare/wrangler-action@v3.19.0
+        id: cf
+        env:
+          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
