@@ -56,7 +56,7 @@ jobs:
 
       # 固定 wrangler-action 到确定版本
       - name: Publish to Cloudflare
-        uses: cloudflare/wrangler-action@v3.19.0
+        uses: cloudflare/wrangler-action@v3
         id: cf
         env:
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
