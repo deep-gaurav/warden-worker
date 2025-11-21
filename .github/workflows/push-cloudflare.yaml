@@ -38,14 +38,14 @@ jobs:
             - name: Install lld
               run: sudo apt install -y lld clang gcc llvm
 
-            # 安装 worker-build（版本不变）
+            # 安装 worker-build
             - name: Install worker-build
               run: |
                   if ! command -v worker-build &> /dev/null; then
                     cargo install worker-build
                   fi
 
-            # 强制安装 wasm-bindgen-cli = 0.2.103
+            # 强制安装 wasm-bindgen-cli 0.2.103
             - name: Install wasm-bindgen-cli 0.2.103
               run: cargo install -f wasm-bindgen-cli --version 0.2.103
 
@@ -53,11 +53,15 @@ jobs:
             - name: Replace D1_DATABASE_ID in wrangler.toml
               run: sed -i "s/\${D1_DATABASE_ID}/${{ secrets.D1_DATABASE_ID }}/g" wrangler.toml
 
-            # Cloudflare 部署
+            # 手动执行构建，覆盖内部 wasm-bindgen
+            - name: Manual build (force wasm-bindgen 0.2.103)
+              run: |
+                  export PATH="$HOME/.cargo/bin:$PATH"
+                  worker-build --release
+
+            # 手动执行部署
             - uses: cloudflare/wrangler-action@v3
-              id: cf
-              env:
-                  D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
               with:
                   apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
                   accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  command: publish
