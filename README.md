@@ -90,7 +90,13 @@ There are no immediate plans to implement these features. The primary goal of th
 
     This will deploy the worker and set up the necessary database tables.
 
-5.  **Configure your Bitwarden client:**
+5. **Set environment variables**
+   
+- `ALLOWED_EMAILS` your-email@example.com
+- `JWT_SECRET` a long random string
+- `JWT_REFRESH_SECRET` a long random string
+
+6.  **Configure your Bitwarden client:**
 
     In your Bitwarden client, go to the self-hosted login screen and enter the URL of your deployed worker (e.g., `https://warden-worker.your-username.workers.dev`).
 
