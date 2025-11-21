@@ -18,17 +18,17 @@ jobs:
             # selecting a toolchain either by action or manual `rustup` calls should happen
             # before the plugin, as the cache uses the current rustc version as its cache key
             - run: rustup toolchain install stable --profile minimal
-            - name: Cache Cargo registry and build artifacts
-              uses: actions/cache@v3
-              with:
-                  path: |
-                      target
-                      ~/.cargo/bin
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                  key: cargo-build-cache-${{ github.run_id }}
-                  restore-keys: |
-                      cargo-build-cache-
+            # - name: Cache Cargo registry and build artifacts
+            #   uses: actions/cache@v3
+            #   with:
+            #       path: |
+            #           target
+            #           ~/.cargo/bin
+            #           ~/.cargo/registry
+            #           ~/.cargo/git
+            #       key: cargo-build-cache-${{ github.run_id }}
+            #       restore-keys: |
+            #           cargo-build-cache-
             - run: rustup target add wasm32-unknown-unknown
             - name: Install lld
               run: sudo apt install -y lld clang gcc llvm
