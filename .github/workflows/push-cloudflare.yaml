@@ -15,10 +15,9 @@ jobs:
         steps:
             - uses: actions/checkout@v4
 
-            # 安装 Rust
+            # selecting a toolchain either by action or manual `rustup` calls should happen
+            # before the plugin, as the cache uses the current rustc version as its cache key
             - run: rustup toolchain install stable --profile minimal
-
-            # 缓存 Cargo
             - name: Cache Cargo registry and build artifacts
               uses: actions/cache@v3
               with:
@@ -30,38 +29,23 @@ jobs:
                   key: cargo-build-cache-${{ github.run_id }}
                   restore-keys: |
                       cargo-build-cache-
-
-            # 添加 wasm 目标
             - run: rustup target add wasm32-unknown-unknown
-
-            # 编译器依赖
             - name: Install lld
               run: sudo apt install -y lld clang gcc llvm
 
-            # 安装 worker-build
             - name: Install worker-build
               run: |
                   if ! command -v worker-build &> /dev/null; then
                     cargo install worker-build
                   fi
 
-            # 强制安装 wasm-bindgen-cli 0.2.103
-            - name: Install wasm-bindgen-cli 0.2.103
-              run: cargo install -f wasm-bindgen-cli --version 0.2.103
-
-            # 替换 wrangler 配置
             - name: Replace D1_DATABASE_ID in wrangler.toml
               run: sed -i "s/\${D1_DATABASE_ID}/${{ secrets.D1_DATABASE_ID }}/g" wrangler.toml
 
-            # 手动执行构建，覆盖内部 wasm-bindgen
-            - name: Manual build (force wasm-bindgen 0.2.103)
-              run: |
-                  export PATH="$HOME/.cargo/bin:$PATH"
-                  worker-build --release
-
-            # 手动执行部署
             - uses: cloudflare/wrangler-action@v3
+              id: cf
+              env:
+                  D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
               with:
                   apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
                   accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-                  command: publish
