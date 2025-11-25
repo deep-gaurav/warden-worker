@@ -16,7 +16,7 @@ codegen-units = 1
 
 [dependencies]
 # Worker & Web APIs
-worker = { version = "0.6", features = ["axum", "http", "d1"] }
+worker = { version = "0.7.0", features = ["axum", "http", "d1"] }
 worker-macros = { version = "0.6", features = ['http'] }
 wasm-bindgen = "0.2.105"
 js-sys = "0.3"
