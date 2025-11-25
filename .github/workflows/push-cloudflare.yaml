@@ -42,16 +42,44 @@ jobs:
             # - name: Replace D1_DATABASE_ID in wrangler.toml
             #   run: sed -i "s/\${D1_DATABASE_ID}/${{ secrets.D1_DATABASE_ID }}/g" wrangler.toml
 
+            - name: Create D1 Database and Capture ID
+              id: create_d1
+              run: |
+                db_output=$(npx wrangler d1 create --location apac warden-worker)
+                if [ $? -ne 0 ]; then
+                  echo "::error::Failed to create D1 database."
+                  exit 1
+                fi
+                db_id=$(echo "$db_output" | grep -oE '\w{8}-\w{4}-\w{4}-\w{4}-\w{12}')
+                if [ -z "$db_id" ]; then
+                  echo "::error::Failed to extract D1 database ID."
+                  echo "Wrangler output: $db_output"
+                  exit 1
+                fi
+                echo "D1_DATABASE_ID=$db_id" >> $GITHUB_ENV
+                echo "Successfully created D1 database with ID: $db_id"
+
+            - name: Replace D1_DATABASE_ID in wrangler.toml
+              run: |
+                if [ -z "${{ env.D1_DATABASE_ID }}" ]; then
+                  echo "::error::D1_DATABASE_ID is not set."
+                  exit 1
+                fi
+                sed -i "s/\${D1_DATABASE_ID}/${{ env.D1_DATABASE_ID }}/g" wrangler.toml
+                echo "Successfully replaced D1_DATABASE_ID in wrangler.toml."
+
+            - name: Apply D1 Database Schema
+              run: npx wrangler d1 execute warden-worker -y --remote --file sql/schema.sql
+
+            - name: Create JWT_SECRET
+              run: openssl rand -base64 48 | tr -d '\n' | npx wrangler secret put JWT_SECRET
+
+            - name: Create JWT_REFRESH_SECRET
+              run: openssl rand -base64 48 | tr -d '\n' | npx wrangler secret put JWT_REFRESH_SECRET
+
             - uses: cloudflare/wrangler-action@v3
               id: cf
-              # env:
-              #     D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
               with:
-                  preCommands: |
-                      sed -i "s/\${D1_DATABASE_ID}/$(npx wrangler d1 create --location apac warden-worker | grep -oE '\w{8}-\w{4}-\w{4}-\w{4}-\w{12}')/g" wrangler.toml
-                      npx wrangler d1 execute warden-worker -y --remote --file sql/schema.sql
-                      openssl rand -base64 48 | tr -d '\n' | npx wrangler secret put JWT_SECRET
-                      openssl rand -base64 48 | tr -d '\n' | npx wrangler secret put JWT_REFRESH_SECRET
                   secrets: |
                       ALLOWED_EMAILS
                   apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
