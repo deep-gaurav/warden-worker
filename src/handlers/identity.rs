@@ -47,6 +47,27 @@ pub struct TokenResponse {
 pub struct UserDecryptionOptions {
     pub has_master_password: bool,
     pub object: String,
+    #[serde(rename = "MasterPasswordUnlock")]
+    pub master_password_unlock: Option<MasterPasswordUnlockData>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MasterPasswordUnlockData {
+    pub salt: String,
+    pub kdf: Kdf,
+    #[serde(rename = "MasterKeyEncryptedUserKey")]
+    pub master_key_encrypted_user_key: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct Kdf {
+    #[serde(rename = "KdfType")]
+    pub kdf_type: i32,
+    pub iterations: i32,
+    pub memory: Option<i32>,
+    pub parallelism: Option<i32>,
 }
 
 fn generate_tokens_and_response(
@@ -99,7 +120,7 @@ fn generate_tokens_and_response(
         expires_in: expires_in.num_seconds(),
         token_type: "Bearer".to_string(),
         refresh_token,
-        key: user.key,
+        key: user.key.clone(),
         private_key: user.private_key,
         kdf: user.kdf_type,
         force_password_reset: false,
@@ -107,6 +128,16 @@ fn generate_tokens_and_response(
         user_decryption_options: UserDecryptionOptions {
             has_master_password: true,
             object: "userDecryptionOptions".to_string(),
+            master_password_unlock: Some(MasterPasswordUnlockData {
+                salt: user.email.clone(), // Using email as salt for now, as we don't store it separately
+                kdf: Kdf {
+                    kdf_type: user.kdf_type,
+                    iterations: user.kdf_iterations,
+                    memory: None,      // Not stored currently
+                    parallelism: None, // Not stored currently
+                },
+                master_key_encrypted_user_key: user.key,
+            }),
         },
     }))
 }
