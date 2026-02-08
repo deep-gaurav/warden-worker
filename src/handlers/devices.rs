@@ -1,5 +1,5 @@
 use axum::{extract::State, Json};
-use axum_extra::extract::WithRejection;
+
 use axum::http::HeaderMap;
 use chrono::Utc;
 use std::sync::Arc;
@@ -8,7 +8,7 @@ use axum::extract::Path;
 
 use crate::db;
 use crate::error::AppError;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct PushTokenRequest {
@@ -48,14 +48,7 @@ pub async fn get_known_device(
          let db = db::get_db(&env)?;
          // Check if device exists for this user (by email lookup)
          // First get user id from email
-         let user_id_res = query!(
-             &db,
-             "SELECT id FROM users WHERE email = ?1",
-             email
-         )
-         .map_err(|_| AppError::Database)?
-         .first::<crate::models::user::User>(None) 
-         .await; // This projection might fail if we don't select all fields or use a partial struct. 
+ 
          // Let's use raw Value or a partial struct. 
          
          // Actually, let's just count
