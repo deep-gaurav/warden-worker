@@ -18,6 +18,7 @@ pub struct Device {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum DeviceType {
     Android = 0,
+    #[allow(non_camel_case_types)]
     iOS = 1,
     ChromeExtension = 2,
     FirefoxExtension = 3,

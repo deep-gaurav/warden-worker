@@ -12,6 +12,7 @@ pub fn api_router(env: Env) -> Router {
 
     Router::new()
         // Identity/Auth routes
+        .route("/api/accounts/revision-date", get(accounts::get_revision_date))
         .route("/identity/accounts/prelogin", post(accounts::prelogin))
         .route(
             "/identity/accounts/register/finish",

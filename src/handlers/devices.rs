@@ -35,7 +35,8 @@ pub async fn get_known_device(
              // For now assuming raw or standard bas64. 
              // Android code: emailAddress.base64UrlEncode()
              // So we should decode it.
-             let decoded = base64::decode_config(s, base64::URL_SAFE_NO_PAD).unwrap_or_else(|_| s.as_bytes().to_vec());
+             use base64::{engine::general_purpose, Engine as _};
+             let decoded = general_purpose::URL_SAFE_NO_PAD.decode(s).unwrap_or_else(|_| s.as_bytes().to_vec());
              String::from_utf8(decoded).unwrap_or_else(|_| s.to_string())
         });
     

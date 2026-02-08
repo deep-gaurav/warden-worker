@@ -71,7 +71,7 @@ pub async fn register(
         updated_at: now,
     };
 
-    let query = query!(
+    let _query = query!(
         &db,
         "INSERT INTO users (id, name, email, master_password_hash, key, private_key, public_key, kdf_iterations, security_stamp, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
@@ -86,12 +86,12 @@ pub async fn register(
          user.security_stamp,
          user.created_at,
          user.updated_at
-    ).map_err(|error|{
+    ).map_err(|_error|{
         AppError::Database
     })?
     .run()
     .await
-    .map_err(|error|{
+    .map_err(|_error|{
         AppError::Database
     })?;
 
@@ -101,4 +101,30 @@ pub async fn register(
 #[worker::send]
 pub async fn send_verification_email() -> String {
     "fixed-token-to-mock".to_string()
+}
+
+#[worker::send]
+pub async fn get_revision_date(
+    claims: crate::auth::Claims,
+    State(env): State<Arc<Env>>,
+) -> Result<Json<i64>, AppError> {
+    let user_id = claims.sub;
+    let db = db::get_db(&env)?;
+
+    let user: User = db
+        .prepare("SELECT * FROM users WHERE id = ?1")
+        .bind(&[user_id.into()])?
+        .first(None)
+        .await
+        .map_err(|_| AppError::Database)?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    // The Android app expects milliseconds.
+    // user.updated_at is likely an ISO string (RFC3339) based on other code.
+    // Let's parse it and convert to millis.
+    let updated_at = chrono::DateTime::parse_from_rfc3339(&user.updated_at)
+        .map_err(|_| AppError::Internal)?
+        .timestamp_millis();
+
+    Ok(Json(updated_at))
 }
