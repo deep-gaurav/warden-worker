@@ -46,3 +46,16 @@ CREATE TABLE IF NOT EXISTS folders (
     updated_at TEXT NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- Devices table for tracking user devices and push tokens
+CREATE TABLE IF NOT EXISTS devices (
+    id TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT,
+    identifier TEXT NOT NULL,
+    push_token TEXT,
+    type INTEGER NOT NULL,
+    name TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);

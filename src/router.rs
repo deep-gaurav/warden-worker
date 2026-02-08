@@ -35,5 +35,8 @@ pub fn api_router(env: Env) -> Router {
         .route("/api/folders/{id}", put(folders::update_folder))
         .route("/api/folders/{id}", delete(folders::delete_folder))
         .route("/api/config", get(config::config))
+        // Devices
+        .route("/api/devices/knowndevice", get(crate::handlers::devices::get_known_device))
+        .route("/api/devices/identifier/{id}/token", put(crate::handlers::devices::put_token))
         .with_state(app_state)
 }

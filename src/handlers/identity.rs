@@ -5,9 +5,10 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
-use worker::Env;
+use worker::{query, Env, console_log};
+use uuid::Uuid;
 
-use crate::{auth::Claims, db, error::AppError, models::user::User};
+use crate::{auth::Claims, db, error::AppError, models::user::User, models::device::Device};
 
 #[derive(Debug, Deserialize)]
 pub struct TokenRequest {
@@ -15,6 +16,10 @@ pub struct TokenRequest {
     username: Option<String>,
     password: Option<String>, // This is the masterPasswordHash
     refresh_token: Option<String>,
+    device_identifier: Option<String>,
+    device_name: Option<String>,
+    device_type: Option<i32>,
+    device_push_token: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -171,6 +176,63 @@ pub async fn token(
                 password_hash.as_bytes(),
             ) {
                 return Err(AppError::Unauthorized("Invalid credentials".to_string()));
+            }
+
+            if let Some(device_identifier) = &payload.device_identifier {
+                let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+                let device_type = payload.device_type.unwrap_or(0);
+                let device_name = payload.device_name.clone().unwrap_or_else(|| "Unknown".to_string());
+                let push_token = payload.device_push_token.clone();
+                let user_id = user.id.clone();
+
+                 let device_exists_result: Result<Option<Device>, _> = query!(
+                     &db,
+                     "SELECT * FROM devices WHERE user_id = ?1 AND identifier = ?2",
+                     user_id,
+                     device_identifier
+                 )
+                 .map_err(|_| AppError::Database)?
+                 .first(None)
+                 .await;
+                 
+                 match device_exists_result {
+                    Ok(Some(_)) => {
+                        let _ = query!(
+                            &db,
+                            "UPDATE devices SET name = ?1, type = ?2, push_token = ?3, updated_at = ?4 WHERE user_id = ?5 AND identifier = ?6",
+                            device_name,
+                            device_type,
+                            push_token,
+                            now,
+                            user_id,
+                            device_identifier
+                        )
+                        .map_err(|_| AppError::Database)?
+                        .run()
+                        .await?;
+                    },
+                    Ok(None) => {
+                        let id = Uuid::new_v4().to_string();
+                        let _ = query!(
+                            &db,
+                            "INSERT INTO devices (id, user_id, identifier, type, name, push_token, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                            id,
+                            user_id,
+                            device_identifier,
+                            device_type,
+                            device_name,
+                            push_token,
+                            now,
+                            now
+                        )
+                        .map_err(|_| AppError::Database)?
+                        .run()
+                        .await?;
+                    },
+                    Err(e) => {
+                        console_log!("Failed to check/update device: {:?}", e);
+                    }
+                 }
             }
 
             generate_tokens_and_response(user, &env)

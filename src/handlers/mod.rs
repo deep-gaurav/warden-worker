@@ -5,3 +5,4 @@ pub mod identity;
 pub mod sync;
 pub mod folders;
 pub mod import;
+pub mod devices;
