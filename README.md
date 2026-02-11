@@ -1,3 +1,5 @@
+> This is unmaintained. Use this more active fork https://github.com/qaz741wsd856/warden-worker
+
 # Warden: A Bitwarden-compatible server for Cloudflare Workers
 
 This project provides a self-hosted, Bitwarden-compatible server that can be deployed to Cloudflare Workers for free. It's designed to be low-maintenance, allowing you to "deploy and forget" without worrying about server management or recurring costs.
